@@ -96,9 +96,9 @@ const writeEnum = (name, values) => {
 	return 'enum ' + name + ' {\n' + values.join('') + '}';
 };
 
-const parseTypesToTS = (table, parentType, blockExports, typesToImport) => {
+const parseTypesToTS = (table, parentType, blockExports, typesToImport, additionalExport) => {
 	const types = table instanceof HTMLTableElement ? collectTypes(table) : table;
-	let exports = '\n\nexport {\n' + (parentType != null ? '\t' + parentType + ',\n' : '');
+	let exports = '\n\nexport {\n' + (additionalExport != null ? '\t' + additionalExport + ',\n' : '') + (parentType != null ? '\t' + parentType + ',\n' : '');
 	let result = '';
 
 	for(let name in types) {
@@ -124,12 +124,12 @@ const parseTypesToTS = (table, parentType, blockExports, typesToImport) => {
 };
 
 const parseFigmaData = () => {
-	const propertiesFile = './properties.js';
+	const propertiesFile = './properties.js', additionalExport = 'StyleType';
 	const result = {}, properties = collectTypes(document.querySelector('#files-types table'));
-	result['properties'] = parseTypesToTS(properties);
+	result['properties'] = parseTypesToTS(properties, null, false, null, additionalExport);
 
 	const imports = Object.keys(properties);
-	imports.push('StyleType');
+	imports.push(additionalExport);
 
 	const types = parseTypesToTS(document.querySelector('#global-properties table'), null, true, imports) +
 						'\n\n' +
