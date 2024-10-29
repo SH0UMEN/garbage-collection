@@ -62,11 +62,13 @@ const toCamelCase = (str) => {
 		.join('');
 };
 
-const writeType = (alias, content, parentType) => {
+const writeType = (alias, content, parentType, toExport) => {
+	toExport.add(alias);
+
 	if(typeof content === 'string')
 		return 'type ' + alias + ' = ' + toCamelCase(makeReplacements(content)) + ';';
 
-	let result = 'type ' + alias + ' = ' + (parentType == null ? '' : parentType + ' & ') + '{\n';
+	let result = 'interface ' + alias + (parentType == null ? '' : ' extends ' + parentType) + ' {\n';
 
 	for(let name in content) {
 		const property = content[name];
@@ -79,7 +81,7 @@ const writeType = (alias, content, parentType) => {
 		if(!typeName.startsWith(alias))
 			typeName = alias + typeName;
 
-		const typeRendered = property.startsWith('\'') ? writeEnum(typeName, property) : writeType(typeName, property);
+		const typeRendered = property.startsWith('\'') ? writeEnum(typeName, property, toExport) : writeType(typeName, property, null, toExport);
 
 		result = typeRendered + '\n\n' + result;
 		result += '\t' + name + ': ' + typeName + ';\n';
@@ -88,18 +90,20 @@ const writeType = (alias, content, parentType) => {
 	return result + '}';
 };
 
-const writeEnum = (name, values) => {
+const writeEnum = (name, values, toExport) => {
 	values = values.split('|').map(value => value.trim());
 	values = values.filter((value, index) => values.indexOf(value) === index);
 	values = values.map((value, index) => '\t' + toCamelCase(value.slice(1, value.length - 1)) + ' = ' + value + (index == values.length - 1 ? '' : ',') + '\n');
 
+	toExport.add(name);
+
 	return 'enum ' + name + ' {\n' + values.join('') + '}';
 };
 
-const parseTypesToTS = (table, parentType, blockExports, typesToImport, additionalExport) => {
+const parseTypesToTS = (table, parentType, blockExports, typesToImport) => {
 	const types = table instanceof HTMLTableElement ? collectTypes(table) : table;
-	let exports = '\n\nexport {\n' + (additionalExport != null ? '\t' + additionalExport + ',\n' : '') + (parentType != null ? '\t' + parentType + ',\n' : '');
-	let result = '';
+	let exports = '\n\nexport {\n' + (parentType != null ? '\t' + parentType + ',\n' : '');
+	let result = '', toExport = new Set();
 
 	for(let name in types) {
 		if(result.length > 0)
@@ -112,24 +116,26 @@ const parseTypesToTS = (table, parentType, blockExports, typesToImport, addition
 
 		name = name.toUpperCase() === name ? name[0] + name.slice(1).toLowerCase() : name;
 
-		if(!blockExports)
-			exports += '\t' + name + ',\n';
 		if(typesToImport != null && typesToImport.includes(name))
 			typesToImport.splice(typesToImport.indexOf(name), 1);
 
-		result += isEnum ? writeEnum(name, properties) : writeType(name, properties, parentType);
+		result += isEnum ? writeEnum(name, properties, toExport) : writeType(name, properties, parentType, toExport);
 	}
+
+	if(!blockExports)
+		for(let name of toExport)
+			exports += '\t' + name + ',\n';
 
 	return result + (blockExports ? '' : exports + '};');
 };
 
 const parseFigmaData = () => {
-	const propertiesFile = './properties.js', additionalExport = 'StyleType';
+	const propertiesFile = './properties.js';
 	const result = {}, properties = collectTypes(document.querySelector('#files-types table'));
-	result['properties'] = parseTypesToTS(properties, null, false, null, additionalExport);
+	result['properties'] = parseTypesToTS(properties, null, false, null);
 
 	const imports = Object.keys(properties);
-	imports.push(additionalExport);
+	imports.push('StyleType');
 
 	const types = parseTypesToTS(document.querySelector('#global-properties table'), null, true, imports) +
 						'\n\n' +
