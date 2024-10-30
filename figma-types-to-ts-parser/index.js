@@ -14,9 +14,9 @@ const collectTypes = (table) => {
 			if(propertyNameNode == null) {
 				let mainTypes = property.querySelectorAll(propertyLinkSelector);
 				if(mainTypes.length > 0)
-					types[name] = Array.from(mainTypes).map((type) => type.textContent).join(' | ');
+					types[name] = { extends: Array.from(mainTypes).map((type) => type.textContent).join(' | ') };
 				else if((mainTypes = property.querySelectorAll(propertyTypesSelector)).length > 0)
-					types[name] = Array.from(mainTypes).map((type) => '\'' + type.textContent.replace('[DEPRECATED] ', '') + '\'').join(' | ');
+					types[name] = { extends: Array.from(mainTypes).map((type) => '\'' + type.textContent.replace('[DEPRECATED] ', '') + '\'').join(' | ') };
 			} else {
 				let typesRendered;
 
@@ -42,6 +42,7 @@ const makeReplacements = (content) => {
 		'Transform': 'Array<Array<number>>',
 		'Number': 'number',
 		'Boolean': 'boolean',
+		'FRAME': 'FrameNode',
 		'String': 'string',
 		'Any': 'any'
 	};
@@ -65,12 +66,15 @@ const toCamelCase = (str) => {
 const writeType = (alias, content, parentType, toExport) => {
 	toExport.add(alias);
 
-	if(typeof content === 'string')
-		return 'type ' + alias + ' = ' + toCamelCase(makeReplacements(content)) + ';';
+	if(typeof content == 'string' || Object.keys(content).length === 1 && content['extends'] != null)
+		return 'type ' + alias + ' = ' + toCamelCase(makeReplacements(content['extends'] || content)) + ';';
 
-	let result = 'interface ' + alias + (parentType == null ? '' : ' extends ' + parentType) + ' {\n';
+	let result = 'interface ' + alias + (parentType == null && content['extends'] == null ? '' : ' extends ' +  toCamelCase(makeReplacements((content['extends'] || parentType)))) + ' {\n';
 
 	for(let name in content) {
+		if(name == 'extends')
+			continue;
+
 		const property = content[name];
 		if(!property.includes('|')) {
 			result += '\t' + name + ': ' + makeReplacements(content[name]) + ';\n';
@@ -115,6 +119,9 @@ const parseTypesToTS = (table, parentType, blockExports, typesToImport) => {
 			name = name.split('_').map((word) => word[0].toUpperCase() + word.slice(1).toLowerCase()).join('');
 
 		name = name.toUpperCase() === name ? name[0] + name.slice(1).toLowerCase() : name;
+
+		if(parentType != null)
+			name += parentType;
 
 		if(typesToImport != null && typesToImport.includes(name))
 			typesToImport.splice(typesToImport.indexOf(name), 1);
