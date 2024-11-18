@@ -1,5 +1,5 @@
 const collectTypes = (table) => {
-	const rowSelector = 'tbody > tr', nameSelector = 'td:first-child [class^=format--mono--]', propertiesSelector = '[class^=developer_docs--propField]';
+	const rowSelector = 'tbody > tr', nameSelector = 'td:first-child [class^=format--mono--]', propertiesSelector = '[class^=developer_docs--propField]', descriptionSelector = '[class^=developer_docs--propDesc] > div';
 	const propertyNameSelector = '[class^=developer_docs--monoDisplay]', propertyTypesSelector = '[class^=format--string]', propertyLinkSelector = '[class^=developer_docs--propDesc] a';
 	const rows = table.querySelectorAll(rowSelector);
 	const types = {};
@@ -18,15 +18,14 @@ const collectTypes = (table) => {
 				else if((mainTypes = property.querySelectorAll(propertyTypesSelector)).length > 0)
 					types[name] = { extends: Array.from(mainTypes).map((type) => '\'' + type.textContent.replace('[DEPRECATED] ', '') + '\'').join(' | ') };
 			} else {
-				let typesRendered;
-
 				const propertyName = propertyNameNode.textContent;
 
-				let propertyTypes = property.querySelectorAll(propertyTypesSelector);
-				if(propertyTypes.length > 0)
+				let typesRendered = propertyNameNode.nextElementSibling.textContent.replaceAll('"', '\'');
+				const propertyTypes = property.querySelectorAll(propertyTypesSelector);
+				const propertyDescription = property.querySelector(descriptionSelector);
+
+				if((typesRendered == 'String' || propertyDescription != null && propertyDescription.textContent.includes('string enum')) && propertyTypes.length > 0)
 					typesRendered = Array.from(propertyTypes).map((type) => '\'' + type.textContent.replace('[DEPRECATED] ', '') + '\'').join(' | ');
-				else
-					typesRendered = propertyNameNode.nextElementSibling.textContent.replaceAll('"', '\'');
 
 				(types[name] || (types[name] = {}))[propertyName] = typesRendered;
 			}
@@ -43,6 +42,7 @@ const makeReplacements = (content) => {
 		'Number': 'number',
 		'Boolean': 'boolean',
 		'FRAME': 'FrameNode',
+		'VECTOR': 'VectorNode',
 		'String': 'string',
 		'Any': 'any'
 	};
